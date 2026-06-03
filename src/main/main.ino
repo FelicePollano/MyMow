@@ -22,9 +22,6 @@ unsigned long prevTime;
 byte speed;
 int dir = 1; 
 
-float X_out, Y_out, Z_out;  // Outputs
-float X1, Y1, Z1;
-
 void setup() {
   Wire.begin();
   initAdxl345();
@@ -46,7 +43,7 @@ void setup() {
 }
 
 void loop() {
-  
+  int AX,AY,AZ;
   
   if(millis()-prevTime>100){
     prevTime=millis();
@@ -65,22 +62,20 @@ void loop() {
     Wire.write(0x32); // Start with register 0x32 (ACCEL_XOUT_H)
     Wire.endTransmission(false);
     Wire.requestFrom(ACCELEROMETER, 6, true); // Read 6 registers total, each axis value is stored in 2 registers
-    X_out = ( Wire.read() | Wire.read() << 8); // X-axis value
-    X1 = X_out / 256; //For a range of +-2g, we need to divide the raw values by 256, according to the datasheet
-    Y_out = ( Wire.read() | Wire.read() << 8); // Y-axis value
-    Y1 = Y_out / 256;
-    Z_out = ( Wire.read() | Wire.read() << 8); // Z-axis value
-    Z1 = Z_out / 256;
+    AX = ( Wire.read() | Wire.read() << 8); // X-axis value
+    AY = ( Wire.read() | Wire.read() << 8); // Y-axis value
+    AZ = ( Wire.read() | Wire.read() << 8); // Z-axis value
+    
     Serial.print("L=");
     Serial.print(analogRead(SENSOR_L));
     Serial.print("R=");
     Serial.print(analogRead(SENSOR_R));
     Serial.print("AX=");
-    Serial.print(X1);
+    Serial.print(AX);
     Serial.print("AY=");
-    Serial.print(Y1);
+    Serial.print(AY);
     Serial.print("AZ=");
-    Serial.println(Z1);
+    Serial.println(AZ);
     
   }
   /*

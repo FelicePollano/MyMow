@@ -44,10 +44,10 @@ CONTEXT _context;
 byte speed;
 int dir = 1; 
 void stateMachine(CONTEXT* ctx){
-  Serial.println(ctx->tilt);
-  if(ctx->tilt){
+  if(ctx->tilt && ctx->status != STATUS_ALARM && ctx->status != STATUS_RESETTABLE_ALARM){
     ctx->status = STATUS_ALARM;
   }
+  
   switch(ctx->status){
     case STATUS_ALARM:
       digitalWrite(MOTOR1_FWD,LOW);
@@ -59,7 +59,7 @@ void stateMachine(CONTEXT* ctx){
       digitalWrite(MOW,LOW);
       //only when we have start button depressed we will accept 
       //a press to exit the alarm status.. button is 1 when depressed
-      if(digitalRead(START)==HIGH){
+      if(digitalRead(START)==1){
         ctx->status=STATUS_RESETTABLE_ALARM;
       }
     break;
@@ -67,6 +67,7 @@ void stateMachine(CONTEXT* ctx){
       if(digitalRead(START)==0){
         ctx->status=STATUS_IDLE;
         ctx->tilt=false;
+        
       }
     break;
   }
@@ -168,7 +169,7 @@ void checkTilt(CONTEXT *ctx){
     AX = ( Wire.read() | Wire.read() << 8); // X-axis value
     AY = ( Wire.read() | Wire.read() << 8); // Y-axis value
     AZ = ( Wire.read() | Wire.read() << 8); // Z-axis value
-    if(AY>TILT_Y){
+    if(AY>TILT_Y && !ctx->tilt){
       ctx->tilt = true;
     }
 }

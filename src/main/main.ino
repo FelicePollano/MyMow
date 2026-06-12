@@ -49,8 +49,16 @@ typedef struct context{
 
 } CONTEXT;
 
-CONTEXT _context;
+typedef struct NotBounching{
+  unsigned long seenHigh;
+  unsigned long seenLow;
+  uint8_t button;
+  bool actualStatus;
 
+}NOTBOUNCHING;
+
+CONTEXT _context;
+NOTBOUNCHING _startButton;
 byte speed;
 int dir = 1; 
 void stateMachine(CONTEXT* ctx){
@@ -79,18 +87,18 @@ void stateMachine(CONTEXT* ctx){
       }
       break;
     case STATUS_IDLE:
-      if(digitalRead(START)==1){
+      if(_startButton.actualStatus==1){
         ctx->status=STATUS_IDLE_READY;
       }
       break;
     case STATUS_IDLE_READY:
-      if(digitalRead(START)==0){
+      if(_startButton.actualStatus==0){
         ctx->status=STATUS_ILIKETOMOWIT_IDLE;
       }
       break;
     case STATUS_ILIKETOMOWIT_IDLE:
       //just start when user is leaving the start button for safety
-      if(digitalRead(START)==1){
+      if(_startButton.actualStatus==1){
         ctx->status=STATUS_ILIKETOMOWIT;
         if(ctx->direction==0){
           ctx->direction=1;
@@ -128,7 +136,7 @@ void stateMachine(CONTEXT* ctx){
       }
       break; 
     case STATUS_ILIKETOMOWIT:
-      if(digitalRead(START)==0){
+      if(_startButton.actualStatus==0){
         ctx->status=STATUS_IDLE;
         digitalWrite(MOTOR1_FWD,LOW);
         digitalWrite(MOTOR2_FWD,LOW);
@@ -154,12 +162,12 @@ void stateMachine(CONTEXT* ctx){
         ctx->speed1=ctx->speed2=0;
       //only when we have start button depressed we will accept 
       //a press to exit the alarm status.. button is 1 when depressed
-      if(digitalRead(START)==1){
+      if(_startButton.actualStatus==1){
         ctx->status=STATUS_RESETTABLE_ALARM;
       }
     break;
     case STATUS_RESETTABLE_ALARM:
-      if(digitalRead(START)==0){
+      if(_startButton.actualStatus==0){
         ctx->status=STATUS_IDLE;
         ctx->tilt=false;
         
@@ -172,6 +180,9 @@ void setup() {
   // 16 MHz clock / 8 (prescaler) / 256 (Timer Top) = 7812.5 Hz
   TCCR0B = (TCCR0B & 0xF8) | 0x02; 
   memset(&_context,0,sizeof(_context));
+  memset(&_startButton,0,sizeof(NOTBOUNCHING));
+  _startButton.button=START;
+  _startButton.actualStatus=HIGH; //since is pull-up, we need to set logical state according to avoid false transitions
   Wire.begin();
   initAdxl345();
   Serial.begin(115200);
@@ -193,6 +204,7 @@ void setup() {
 bool accelReadable=false;
 void loop() {
   updateHeartBeats(&_context);
+  unbounch(&_startButton,&_context);
   stateMachine(&_context);
   
   if(_context.HbSeconds>=1){
@@ -210,12 +222,13 @@ void loop() {
   if(_context.Hb100Ms%2==0){
     
     consumeAccelerometerInts();
-
+    /*
     Serial.print("L=");
     Serial.print(analogRead(SENSOR_L));
     Serial.print("R=");
     Serial.println(analogRead(SENSOR_R));
-   
+    */
+    Serial.println(_startButton.actualStatus);
   }
   /*
   if(millis()-prevTime>10){
@@ -319,6 +332,27 @@ void accelerate(CONTEXT* ctx){
       analogWrite(MOTOR2_SPEED,ctx->speed2);
     }
     
+  }
+}
+void unbounch(NOTBOUNCHING* button,CONTEXT* ctx){
+  int cs = digitalRead(button->button);
+  if(cs ==HIGH && button->seenHigh==0){
+    button->seenHigh=ctx->Hb10Ms;
+  }
+  if(cs ==LOW && button->seenLow==0){
+    button->seenLow=ctx->Hb10Ms;
+  }
+  if(cs == HIGH ){
+    button->seenLow=0;
+  }
+  if(cs == LOW ){
+    button->seenHigh=0;
+  }
+  if(button->seenHigh!=0 && ctx->Hb10Ms-button->seenHigh>9){
+    button->actualStatus=HIGH;
+  }
+  if(button->seenLow!=0 && ctx->Hb10Ms-button->seenLow>9){
+    button->actualStatus=LOW;
   }
 }
 void updateHmi(CONTEXT *ctx){
